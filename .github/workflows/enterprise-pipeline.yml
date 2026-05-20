@@ -12,7 +12,7 @@ permissions:
   pull-requests: write
 
 env:
-  ARM_CLIENT_ID: ${{ github.event_name == 'pull_request' && secrets.AZURE_PR_CLIENT_ID || secrets.AZURE_CLIENT_ID }}
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }} # Consolidated to use your working prod client identity
   ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
   ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
   ARM_USE_OIDC: true
@@ -29,18 +29,15 @@ jobs:
       - name: Code Format Validation
         run: terraform fmt -check -recursive
 
-      
       # Gate B: Static Code Analysis & Syntax checks
       - name: Install and Run TFLint
         uses: terraform-linters/setup-tflint@v4
         with:
           tflint_version: v0.48.0
-          
       - name: Initialize and Execute TFLint
         run: |
           tflint --init
           tflint
-
 
   functional_testing:
     name: '🧪 2. Terratest Execution'
@@ -56,10 +53,11 @@ jobs:
       - name: Log into Sandbox Identity
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZURE_PR_CLIENT_ID }}
+          client-id: ${{ env.ARM_CLIENT_ID }}
           tenant-id: ${{ env.ARM_TENANT_ID }}
           subscription-id: ${{ env.ARM_SUBSCRIPTION_ID }}
 
+      # Automatically installs and updates dependencies to run the test script
       - name: Execute Terratest Blueprint Test
         run: |
           cd test
@@ -79,13 +77,13 @@ jobs:
           tenant-id: ${{ env.ARM_TENANT_ID }}
           subscription-id: ${{ env.ARM_SUBSCRIPTION_ID }}
 
-      - name: Terraform Init
+      - name: Workspace Initialization
         run: |
-            terraform init \
-                -backend-config="resource_group_name=rg-terraform-backend" \
-                -backend-config="storage_account_name=ravitejatfstatebackend" \
-                -backend-config="container_name=tfstate" \
-                -backend-config="key=prod.terraform.tfstate"
+          terraform init \
+            -backend-config="resource_group_name=rg-terraform-backend" \
+            -backend-config="storage_account_name=ravitejatfstatebackend" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=prod.terraform.tfstate"
 
       # Gate D: Plan Drift Detection Setup (-refresh-only)
       - name: Evaluate Cloud Drift Configuration
@@ -95,6 +93,7 @@ jobs:
           terraform plan -detailed-exitcode -refresh-only
           echo "exit_status=$?" >> $GITHUB_OUTPUT
 
+      # Generates alert annotations if someone manually edited the cloud resources
       - name: Emit Drift Warnings
         if: steps.drift_check.outputs.exit_status == '2'
         run: echo "::warning title=Drift Detected::The current cloud infrastructure states deviate from source code parameters!"
@@ -112,12 +111,17 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
       - uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          client-id: ${{ env.ARM_CLIENT_ID }}
           tenant-id: ${{ env.ARM_TENANT_ID }}
           subscription-id: ${{ env.ARM_SUBSCRIPTION_ID }}
       
       - name: Initialization
-        run: terraform init
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=rg-terraform-backend" \
+            -backend-config="storage_account_name=ravitejatfstatebackend" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=prod.terraform.tfstate"
 
       - name: Enforce Final Configuration Build
         run: terraform apply -auto-approve
