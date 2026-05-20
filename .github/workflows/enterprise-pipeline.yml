@@ -57,11 +57,16 @@ jobs:
           tenant-id: ${{ env.ARM_TENANT_ID }}
           subscription-id: ${{ env.ARM_SUBSCRIPTION_ID }}
 
-      # Automatically initializes Go modules and downlinks dependencies on the fly
+      # Automatically sets up a functional Go module environment inside the runner root
       - name: Execute Terratest Blueprint Test
         run: |
-          cd test
-          go test -v -timeout 45m
+          go mod init terraform-enterprise-pipeline
+          go get ://github.com
+          go get ://github.com
+          go get ://github.com
+          go mod tidy
+          go test -v ./test/... -timeout 45m
+
 
 
   drift_and_preview:
