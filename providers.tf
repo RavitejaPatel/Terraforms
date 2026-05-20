@@ -1,4 +1,6 @@
 terraform {
+  required_version = ">= 1.5.0" # Satisfies the tflint version requirement
+
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
@@ -6,7 +8,6 @@ terraform {
     }
   }
 
-  # Leave these empty to receive parameters safely during pipeline initialization
   backend "azurerm" {
     resource_group_name  = ""
     storage_account_name = ""
