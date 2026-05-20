@@ -12,11 +12,11 @@ terraform {
     storage_account_name = ""
     container_name       = ""
     key                  = ""
-    use_azure_rbac       = true 
+    use_azure_rbac       = true
   }
 }
 
 provider "azurerm" {
   features {}
-  use_oidc = true 
+  use_oidc = true
 }
