@@ -1,0 +1,123 @@
+name: 'Enterprise CI/CD Engine'
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+env:
+  ARM_CLIENT_ID: ${{ github.event_name == 'pull_request' && secrets.AZURE_PR_CLIENT_ID || secrets.AZURE_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  ARM_USE_OIDC: true
+
+jobs:
+  quality_gates:
+    name: '🛡️ 1. Quality Gates'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+
+      # Gate A: Enforce file formatting uniformity
+      - name: Code Format Validation
+        run: terraform fmt -check -recursive
+
+      
+      # Gate B: Static Code Analysis & Syntax checks
+      - name: Install and Run TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.48.0
+          
+      - name: Initialize and Execute TFLint
+        run: |
+          tflint --init
+          tflint
+
+
+  functional_testing:
+    name: '🧪 2. Terratest Execution'
+    needs: quality_gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Log into Sandbox Identity
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_PR_CLIENT_ID }}
+          tenant-id: ${{ env.ARM_TENANT_ID }}
+          subscription-id: ${{ env.ARM_SUBSCRIPTION_ID }}
+
+      - name: Execute Terratest Blueprint Test
+        run: |
+          cd test
+          go mod tidy
+          go test -v -timeout 45m
+
+  drift_and_preview:
+    name: '🔍 3. Drift Check & Plan'
+    needs: functional_testing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ env.ARM_CLIENT_ID }}
+          tenant-id: ${{ env.ARM_TENANT_ID }}
+          subscription-id: ${{ env.ARM_SUBSCRIPTION_ID }}
+
+      - name: Terraform Init
+        run: |
+            terraform init \
+                -backend-config="resource_group_name=rg-terraform-backend" \
+                -backend-config="storage_account_name=ravitejatfstatebackend" \
+                -backend-config="container_name=tfstate" \
+                -backend-config="key=prod.terraform.tfstate"
+
+      # Gate D: Plan Drift Detection Setup (-refresh-only)
+      - name: Evaluate Cloud Drift Configuration
+        id: drift_check
+        continue-on-error: true
+        run: |
+          terraform plan -detailed-exitcode -refresh-only
+          echo "exit_status=$?" >> $GITHUB_OUTPUT
+
+      - name: Emit Drift Warnings
+        if: steps.drift_check.outputs.exit_status == '2'
+        run: echo "::warning title=Drift Detected::The current cloud infrastructure states deviate from source code parameters!"
+
+      - name: Generate Target Deployment Plan
+        run: terraform plan -no-color
+
+  deploy:
+    name: '🚀 4. Production Release'
+    needs: drift_and_preview
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.ARM_TENANT_ID }}
+          subscription-id: ${{ env.ARM_SUBSCRIPTION_ID }}
+      
+      - name: Initialization
+        run: terraform init
+
+      - name: Enforce Final Configuration Build
+        run: terraform apply -auto-approve

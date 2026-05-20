@@ -1,0 +1,6 @@
+{
+  "name": "gh-actions-main-deploy",
+  "issuer": "https://githubusercontent.com",
+  "subject": "repo:RavitejaPatel/Terraforms:ref:refs/heads/main",
+  "audiences": ["api://AzureADTokenExchange"]
+}
