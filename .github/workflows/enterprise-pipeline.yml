@@ -61,11 +61,6 @@ jobs:
       - name: Execute Terratest Blueprint Test
         run: |
           cd test
-          go mod init test
-          go get ://github.com
-          go get ://github.com
-          go get ://github.com
-          go mod tidy
           go test -v -timeout 45m
 
 
