@@ -59,23 +59,12 @@ jobs:
 
       - name: Execute Terratest Blueprint Test
         env:
-          GOPROXY: "https://proxy.golang.org,direct"
+          GOPROXY: "https://proxy.golang.org,direct" # Forces public proxies first
+          GOPRIVATE: ""                             # Ensures no public repos are treated as private
         run: |
           cd test
-          rm -rf *
-          
-          # 1. Drop in your pristine test code block (Fully verified variables)
-          echo "cGFja2FnZSB0ZXN0CgppbXBvcnQgKAoJInRlc3RpbmciCgoJImdpdGh1Yi5jb20vZ3J1bnR3b3JrLWlvL3RlcnJhdGVzdC9tb2R1bGVzL2F6dXJlIgoJImdpdGh1Yi5jb20vZ3J1bnR3b3JrLWlvL3RlcnJhdGVzdC9tb2R1bGVzL3RlcnJhZm9ybSIKCSJnaXRodWIuY29tL3N0cmV0Y2hyL3Rlc3RpZnkvYXNzZXJ0IikKCmZ1bmMgVGVzdEVudGVycHJpc2VQaXBlbGluZURlcGxveW1lbnQodCAqdGVzdGluZy5UKSB7Cgl0LlBhcmFsbGVsKCkKCgl0ZXJyYWZvcm1PcHRpb25zIDo9IHRlcnJhZm9ybS5XaXRoRGVmYXVsdFJldHJ5YWJsZUVycm9ycyh0LCAmdGVycmFmb3JtLk9wdGlvbnN7CgkJVGVycmFmb3JtRGlyOiAiLi4vIiwKCX0pCgoJZGVmZXIgdGVycmFmb3JtLkRlc3Ryb3kodCwgdGVycmFmb3JtT3B0aW9ucykKCgl0ZXJyYWZvcm0uSW5pdEFuZEFwcGx5KHQsIHRlcnJhZm9ybU9wdGlvbnMpCgoJcmdOYW1lIDo9IHRlcnJhZm9ybS5PdXRwdXQodCwgdGVycmFmb3JtT3B0aW9ucywgInJlc291cmNlX2dyb3VwX25hbWUiKQoKCWV4aXN0cyA6PSBhenVyZS5SZXNvdXJjZUdyb3VwRXhpc3RzKHQsIHJnTmFtZSwgIiIpCglhc3NlcnQuVHJ1ZSh0LCBleGlzdHMsICJUaGUgdGFyZ2V0IGVudGVycHJpc2UgcmVzb3VyY2UgZ3JvdXAgd2FzIG5vdCBwcm92aXNpb25lZCBzdWNjZXNzZnVsbHkuIikKfQ==" | base64 -d > infra_test.go
-
-          # 2. Drop in the verified go.mod track (v1.9.0)
-          echo "bW9kdWxlIHRlc3QKCmdvIDEuMjEKCnJlcXVpcmUgKAoJZ2l0aHViLmNvbS9ncnVudHdvcmstaW8vdGVycmF0ZXN0IHYwLjQ4LjEKCWdpdGh1Yi5jb20vc3RyZXRjaHIvdGVzdGlmeSB2MS45LjAKKQ==" | base64 -d > go.mod
-          
-          # 3. Resolve dependency graphs seamlessly via public proxy
           go mod tidy
-          
-          # 4. Run your tests
           go test -v -timeout 45m
-
 
 
   drift_and_preview:
