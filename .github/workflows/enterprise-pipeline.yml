@@ -58,21 +58,19 @@ jobs:
           subscription-id: ${{ env.ARM_SUBSCRIPTION_ID }}
 
     
-        # Uses 'go mod edit' to inject dependencies cleanly, avoiding the GitHub URL-parsing bug
+       # Bypasses the string parser completely by letting Go auto-download dependencies during the test run
       - name: Execute Terratest Blueprint Test
+        env:
+          GOPROXY: "https://golang.org,direct"
         run: |
           go mod init terraform-enterprise-pipeline
           
-          # Injecting requirements directly into the go.mod matrix structure
-          go mod edit -require=://github.com
-          go mod edit -require=://github.com
-          
-          # Automatically downloads and sets up the exact dependency tree safely
+          # This forces Go to automatically fetch all missing imports found in test/infra_test.go
           go mod tidy
           
-          # Execute the unit testing script directly
+          # Run the test suite natively
           go test -v ./test/... -timeout 45m
-
+          
 
   drift_and_preview:
     name: '🔍 3. Drift Check & Plan'
