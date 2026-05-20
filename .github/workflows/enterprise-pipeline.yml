@@ -57,16 +57,21 @@ jobs:
           tenant-id: ${{ env.ARM_TENANT_ID }}
           subscription-id: ${{ env.ARM_SUBSCRIPTION_ID }}
 
-      # Automatically sets up a functional Go module environment inside the runner root
+    
+        # Uses 'go mod edit' to inject dependencies cleanly, avoiding the GitHub URL-parsing bug
       - name: Execute Terratest Blueprint Test
         run: |
           go mod init terraform-enterprise-pipeline
-          go get ://github.com
-          go get ://github.com
-          go get ://github.com
+          
+          # Injecting requirements directly into the go.mod matrix structure
+          go mod edit -require=://github.com
+          go mod edit -require=://github.com
+          
+          # Automatically downloads and sets up the exact dependency tree safely
           go mod tidy
+          
+          # Execute the unit testing script directly
           go test -v ./test/... -timeout 45m
-
 
 
   drift_and_preview:
